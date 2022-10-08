@@ -1,0 +1,25 @@
+'99942 Apophis (2004 MN4)'
+
+from astroquery.jplhorizons import Horizons
+
+#print(help(Horizons))
+
+a = Horizons(id=99942, location="@399", epochs = {'start': '2029-01-13 00:00 ', 'stop': '2029-04-14 4:01 ', 'step': "1h"}).vectors()
+print(a["targetname"][0])
+
+astroid_dist = Horizons(id=99942, location="@399", epochs = {'start': '2029-04-13 00:00 ', 'stop': '2029-04-14 4:01 ', 'step': "1h"}).vectors()["range"] ## JPL units is in AU
+min(jupiter_dist)
+
+mylocation_dicto = {}
+mylocation_dicto["lat"], mylocation_dicto["lon"] ,mylocation_dicto["elevation"]= 41.2579028 , -74.73456666666667 , 0.34702294557097116
+mylocation_dicto_east = mylocation_dicto
+mylocation_dicto_east["lon"] = 74
+
+east  = Horizons(id=99942, location=mylocation_dicto_east, epochs = {'start': '2029-04-13 00:00 ', 'stop': '2029-04-14 4:01 ', 'step': "1h"}).ephemerides() ## JPL units is in AU
+west  = Horizons(id=99942, location=mylocation_dicto, epochs = {'start': '2029-04-13 00:00 ', 'stop': '2029-04-14 4:01 ', 'step': "1h"}).ephemerides() ## JPL units is in AU
+
+for i in zip(east["EL"], east["V"]):
+    print(i)
+
+for i in zip(west["EL"], west["V"]):
+    print(i)
