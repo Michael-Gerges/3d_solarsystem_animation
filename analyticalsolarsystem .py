@@ -18,6 +18,7 @@ masslist = [0.330,4.87,5.97,0.073,0.642,1898,568,86.8,102,0.0130] # 10**24
 idlist = [199,299,399,499,599,699,799,899,999]
 
 
+
 class Vector:
     def __init__(self, x=0, y=0, z=0):
         self.x = x
@@ -90,7 +91,55 @@ class Vector:
             self.y / magnitude,
             self.z / magnitude,
         )
+    def clone(self):
+        return Vector(self.x, self.y, self.z)
+# Scalar Product
+            
+    def dot(self,other):
+        """Returns dot product of two vectors"""
+        dotproduct = 0.0
+        dotproduct += self.x*other.x
+        dotproduct += self.y*other.y
+        dotproduct += self.z*other.z
+        return dotproduct
+    
+# Vector Product
+    def cross(self,other):
+        """Calculates cross product (self x other)"""
 
+        cross = Vector(0.0,0.0,0.0)
+        cross.x = self.y * other.z - self.z * other.y
+        cross.y = self.z * other.x - self.x * other.z
+        cross.z = self.x * other.y - self.y * other.x
+        return cross
+
+    
+# Rotate around the Z axis
+
+    def rotateX(self,angle):
+        """Rotates the vector around the x axis"""
+        oldvec = self.clone()
+        self.x - oldvec.x
+        self.y = oldvec.y*np.cos(angle) - oldvec.z*np.sin(angle)
+        self.z = oldvec.y*np.sin(angle) + oldvec.z*np.cos(angle)
+
+    def rotateY(self,angle):
+        """Rotates the vector around the y axis"""
+        oldvec = self.clone()
+        self.x = oldvec.x*np.cos(angle) + oldvec.z*np.sin(angle)
+        self.y = oldvec.y
+        self.z = -oldvec.x*np.sin(angle) + oldvec.z*np.cos(angle)
+
+    def rotateZ(self, angle):
+        """Rotates the vector around the z axis"""
+ 
+        oldvec = self.clone()
+
+        self.x = oldvec.x*np.cos(angle) - oldvec.y*np.sin(angle)
+        self.y = oldvec.x*np.sin(angle) + oldvec.y*np.cos(angle)
+        self.z = oldvec.z
+
+    
 
 
 class SolarSystem:
@@ -206,107 +255,4 @@ class Planet(SolarSystemBody):
     ):
         super(Planet, self).__init__(solar_system, mass, position, velocity)
         self.color = next(Planet.colors)
-
-
-
-#### mock system (remove the gravitational_constant and au and set     display_log_base = 1.3 and)
-
-
-#solar_system = SolarSystem(400 , projection_2d=True)
-#suns = (
-#    Sun(solar_system, position=(40, 40, 40), velocity=(6, 0, 6)),
-#    Sun(solar_system, position=(-40, -40, 40), velocity=(-6, 0, -6)),
-#)
-#planets = (
-#    Planet(
-#        solar_system,
-#        10,
-#        position=(100, 100, 0),
-#        velocity=(0, 5.5, 5.5),
-#    ),
-#    Planet(
-#        solar_system,
-#        20,
-#        position=(0, 0, 0),
-#        velocity=(-11, 11, 0),
-#    ),
-#)
-#
-#def go():
-#    now = datetime.datetime.utcnow().minute
-#    print(now)
-#    while datetime.datetime.utcnow().minute < now +1 :
-#        solar_system.calculate_all_body_interactions()
-#        solar_system.update_all()
-#        solar_system.draw_all()
-#
-#
-#go()
-#
-
-
-solar_system_2 = SolarSystem(50  )#, projection_2d=True)
-Sun(solar_system_2, mass=sunmass , position=(0, 0, 0), velocity=(0, 0, 0))
-
-
-
-#MERCURY_vector = (Horizons(idlist[0], epochs=epo)).vectors()
-#x = (MERCURY_vector["x"][0])
-#y = (MERCURY_vector["y"][0])
-#z = (MERCURY_vector["z"][0])
-#vx = (MERCURY_vector["vx"][0])
-#vy = (MERCURY_vector["vy"][0])
-#vz = (MERCURY_vector["vz"][0])
-#MERCURY = Planet(solar_system_2, masslist[0] * 10**24, position=(x * au, y* au, z* au), velocity=(vx* au/86400, vy *au/86400, vz* au/86400) )  # the V unit in JPL system is au/d
-
-#VENUS_vector = (Horizons(idlist[1], epochs=epo)).vectors()
-#x = (VENUS_vector["x"][0])
-#y = (VENUS_vector["y"][0])
-#z = (VENUS_vector["z"][0])
-#vx = (VENUS_vector["vx"][0])
-#vy = (VENUS_vector["vy"][0])
-#vz = (VENUS_vector["vz"][0])
-#VENUS = Planet(solar_system_2, masslist[1] * 10**24, position=(x * au, y* au, z* au), velocity=(vx* au/86400, vy *au/86400, vz* au/86400) )
-
-
-EARTH_vector = (Horizons(idlist[2], epochs=epo)).vectors()
-x = (EARTH_vector["x"][0])
-y = (EARTH_vector["y"][0])
-z = (EARTH_vector["z"][0])
-vx = (EARTH_vector["vx"][0])
-vy = (EARTH_vector["vy"][0])
-vz = (EARTH_vector["vz"][0])
-end_vector = Vector(EARTH_vector["x"][index_of_result] *au   ,(EARTH_vector["y"][index_of_result]) * au,(EARTH_vector["z"][index_of_result]) * au)
-
-
-
-EARTH = Planet(solar_system_2, masslist[2] * 10**24, position=(x * au, y* au, z* au), velocity=(vx* au/86400, vy *au/86400, vz* au/86400) )
-
-#MARS_vector = (Horizons(idlist[3], epochs=epo)).vectors()
-#x = (MARS_vector["x"][0])
-#y = (MARS_vector["y"][0])
-#z = (MARS_vector["z"][0])
-#vx = (MARS_vector["vx"][0])
-#vy = (MARS_vector["vy"][0])
-#vz = (MARS_vector["vz"][0])
-#MARS = Planet(solar_system_2, masslist[3] * 10**24, position=(x * au, y* au, z* au), velocity=(vx* au/86400, vy *au/86400, vz* au/86400) )
-
-
-
-for i in range(number_of_steps):
-        solar_system_2.calculate_all_body_interactions()
-        solar_system_2.update_all()
-        solar_system_2.draw_all()
-
-
-
-
-#print(MERCURY.position[0]- (MERCURY_vector["x"][index_of_result]) * au, MERCURY.position[1]  -(MERCURY_vector["y"][index_of_result]) *au, MERCURY.position[2] - (MERCURY_vector["z"][index_of_result]) * au)
-#print(VENUS.position [0] - (VENUS_vector["x"][index_of_result]) *au   , VENUS.position[1]   - (VENUS_vector["y"][index_of_result]) * au, VENUS.position[2]    - (VENUS_vector["z"][index_of_result]) * au)
-print(EARTH.position[0]  - (EARTH_vector["x"][index_of_result]) *au   ,EARTH.position[1]   - (EARTH_vector["y"][index_of_result]) * au, EARTH.position[2]     - (EARTH_vector["z"][index_of_result]) * au)
-#print(MARS.position[0]   - (MARS_vector["x"][index_of_result]) *au    ,MARS.position[1]     - (MARS_vector["y"][index_of_result]) * au, MARS.position[2]      - (MARS_vector["z"][index_of_result]) * au)
-
-#print(MERCURY_vector["datetime_str"][index_of_result])
-
-
 
