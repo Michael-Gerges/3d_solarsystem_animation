@@ -1,0 +1,74 @@
+import spiceypy
+import datetime
+from astropy.time import Time
+from astroquery.jplhorizons import Horizons
+import astropy.units as u
+import os
+
+kerneldir = r"c:/Users/micha/OneDrive/Desktop/kernels"
+os.chdir(r"c:/Users/micha/OneDrive/Desktop/kernels")
+for i in os.listdir():
+    filename = (os.path.join(kerneldir,i ))
+    spiceypy.furnsh(filename)
+
+
+comparison_target = 399
+
+'''
+INIT_TIME_UTC = datetime.datetime(year=2000, month=1, day=1, \
+                                  hour=0, minute=0, second=0)
+DELTA_DAYS = 10000
+END_TIME_UTC = INIT_TIME_UTC + datetime.timedelta(days=DELTA_DAYS)
+INIT_TIME_UTC_STR = INIT_TIME_UTC.strftime('%Y-%m-%dT%H:%M:%S')
+END_TIME_UTC_STR = END_TIME_UTC.strftime('%Y-%m-%dT%H:%M:%S')
+INIT_TIME_ET = spiceypy.utc2et(INIT_TIME_UTC_STR)
+END_TIME_ET = spiceypy.utc2et(END_TIME_UTC_STR)
+TIME_INTERVAL_ET = np.linspace(INIT_TIME_ET, END_TIME_ET, DELTA_DAYS)
+
+'''
+
+_, RADII_SUN = spiceypy.bodvcd(bodyid=10, item='RADII', maxn=3)
+RADIUS_SUN = RADII_SUN[0]
+
+au = 1.496e+8  # km
+
+DATE_TODAY = datetime.datetime.today() # or datetime.datetime.now()
+midnight = DATE_TODAY.strftime('%Y-%m-%dT00:00:00')
+ET_TODAY_MIDNIGHT = spiceypy.utc2et(midnight)
+onehourlater = datetime.datetime.fromisoformat(midnight).timestamp() + 3600 
+endtime = (datetime.datetime.fromtimestamp(onehourlater))
+epochs = {'start': str(midnight), 'stop': str(endtime), 'step': "1h"}
+
+# SPICEY DATA
+EARTH_STATE_WRT_SUN, EARTH_SUN_LIGHT_TIME = spiceypy.spkgeo(targ=comparison_target, et=ET_TODAY_MIDNIGHT, ref='ECLIPJ2000', obs=10)
+# JET PROPULTION LAB DATA 
+earth_vector = (Horizons(id=comparison_target, location="@10", epochs=epochs).vectors())
+
+
+EARTH_SUN_DISTANCE = Vector(*EARTH_STATE_WRT_SUN[:3]).get_magnitude()
+EARTH_SUN_angular_velocity = Vector(*EARTH_STATE_WRT_SUN[3:]).get_magnitude()
+EARTH_SUN_angular_velocity_2 = math.sqrt((  (earth_vector[0]["vx"] *(au/86400) )**2.0) + ((earth_vector[0]["vy"] * (au/86400))**2.0) + ((earth_vector[0]["vz"] * (au/86400))**2.0))
+
+
+#EARTH_SUN_DISTANCE = math.sqrt(EARTH_STATE_WRT_SUN[0]**2.0 + EARTH_STATE_WRT_SUN[1]**2.0 + EARTH_STATE_WRT_SUN[2]**2.0)
+#EARTH_SUN_DISTANCE_AU = spiceypy.convrt(EARTH_SUN_DISTANCE, 'km', 'AU')
+#EARTH_SUN_angular_velocity = math.sqrt(EARTH_STATE_WRT_SUN[3]**2.0 + EARTH_STATE_WRT_SUN[4]**2.0 + EARTH_STATE_WRT_SUN[5]**2.0)
+
+print("comparing the xyz postion and range between spiceypy and JPL")
+print((earth_vector[0]["x"] * au ) - (EARTH_STATE_WRT_SUN[0]) ) 
+print((earth_vector[0]["y"] * au) -(EARTH_STATE_WRT_SUN[1]))
+print((earth_vector[0]["z"] * au )- (EARTH_STATE_WRT_SUN[2]))
+print((EARTH_SUN_DISTANCE) - (earth_vector[0]["range"]) * au)
+
+_, GM_SUN = spiceypy.bodvcd(bodyid=10, item='GM', maxn=1)
+V_ORB_FUNC = lambda gm, r: math.sqrt(gm/r)
+EARTH_ORB_SPEED_WRT_SUN_THEORY = V_ORB_FUNC(GM_SUN[0], EARTH_SUN_DISTANCE)
+
+
+print("comparing the xyz velocities and angular velocity between spiceypy and JPL and theoretical  law")
+
+print((a[0]["vx"] * (au/86400) ) - (EARTH_STATE_WRT_SUN[3]) ) # km per second
+print((a[0]["vy"] * (au/86400) ) - (EARTH_STATE_WRT_SUN[4]))
+print((a[0]["vz"] * (au/86400) )-  (EARTH_STATE_WRT_SUN[5]))
+print(  EARTH_SUN_angular_velocity,  EARTH_SUN_angular_velocity_2, EARTH_ORB_SPEED_WRT_SUN_THEORY )
+
