@@ -1,0 +1,200 @@
+available_bodies = ["sun", "earth", "moon", 'venus' "mars","mercury" , "YR4", 'apophis',"jupiter", 'saturn', 'uranus', 'neptune' ]
+default_speed = 50
+start_date   = "2032-1-10 12:00"
+end_date   = "2032-12-23 12:00" # end_date   = "2029-04-22 12:00" or  "2032-12-22 12:00" 
+step='3d'
+graph_center='@sun'
+selected_bodies = ['sun',"earth", "moon" , 'venus', "mars","mercury" , "YR4", 'apophis'] 
+
+from astroquery.jplhorizons import Horizons
+import numpy as np
+import re
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
+
+import warnings
+from astropy.utils.exceptions import AstropyDeprecationWarning
+warnings.simplefilter('ignore', category=AstropyDeprecationWarning)
+
+
+
+def icrf_to_ecliptic(x, y, z):
+    """Rotates ICRF coordinates into the heliocentric ecliptic plane."""
+    OBLIQUITY_RAD = np.radians(23.436)  # Convert to radians
+
+    rotation_matrix = np.array([
+        [1, 0, 0],
+        [0, np.cos(OBLIQUITY_RAD), -np.sin(OBLIQUITY_RAD)],
+        [0, np.sin(OBLIQUITY_RAD), np.cos(OBLIQUITY_RAD)]
+    ])
+    return np.dot(rotation_matrix, np.array([x, y, z]))
+
+
+def get_trajectory(obj_id, start_date, end_date, step, id_type, location):
+    obj = Horizons(id=obj_id,id_type=id_type,location=location,epochs={'start': start_date, 'stop': end_date, 'step': step},  )
+    vectors = obj.vectors(refplane='frame') # ecliptic is Earth’s orbital plane, by using frame you dont need to call icrf_to_ecliptic
+    
+    jd = np.array(vectors['datetime_jd'], dtype=float)
+    x = np.array(vectors['x'], dtype=float)
+    y = np.array(vectors['y'], dtype=float)
+    z = np.array(vectors['z'], dtype=float)
+    x_ecl, y_ecl, z_ecl = icrf_to_ecliptic(x, y, z)
+    return jd ,x,y,z
+
+
+
+enlargment_factor = 3870 # for visiblity 
+animation_sun_size = enlargment_factor *   695700 / 1.496e8 # km to Au
+animation_earth_size = 25*enlargment_factor * 6371   / 1.496e8 
+animation_moon_size = 25*enlargment_factor * 1737  / 1.496e8 
+
+
+
+body_definitions = {
+    "sun": ("10", 'majorbody', '#ff5a00', animation_sun_size),
+    "mercury": ("199", 'majorbody', 'gray', 2),
+    "venus": ("299", 'majorbody', 'orange', 4),
+    "earth": ("399", 'majorbody', 'blue', animation_earth_size),
+    "moon": ("301", 'majorbody', 'lightgray', animation_moon_size),
+    "mars": ("499", 'majorbody', 'lightsalmon', 3),
+    "jupiter": ("599", 'majorbody', 'rosybrown', 8),
+    "saturn": ("699", 'majorbody', 'gold', 7),
+    "uranus": ("799", 'majorbody', 'cyan', 6),
+    "neptune": ("899", 'majorbody', 'darkblue', 6),
+    "yr4": ("2024 YR4", 'smallbody', 'maroon', 3),
+    "apophis": (99942, 'smallbody', 'maroon', 3),
+
+}
+
+
+
+bodies = []
+for name in selected_bodies:
+    name= name.lower()
+    obj_id, id_type, color, size = body_definitions[name]
+    jd, x, y, z = get_trajectory(obj_id, start_date, end_date, step=step, id_type=id_type, location=graph_center)
+    bodies.append((name.capitalize(), x, y, z, color, size))
+
+
+
+
+# for the slider:: 
+num_frames = len(jd)  
+start_datetime = datetime(2000, 1, 1) + timedelta(days=jd[0] - 2451545.0)  
+
+def parse_step(step):
+    match = re.match(r"(\d+)([a-zA-Z]+)", step)
+    if not match:
+        raise ValueError("Invalid step format. Use something like '12h', '1d', '30m', '2mo'.")
+    value, unit = int(match.group(1)), match.group(2).lower()
+    if unit in ["m", "min"]:  # Minutes
+        return timedelta(minutes=value)
+    elif unit in ["h", "hr", "hrs"]:  # Hours
+        return timedelta(hours=value)
+    elif unit in ["d", "day", "days"]:  # Days
+        return timedelta(days=value)
+    elif unit in ["mo", "month", "months"]:  # Approximate 1 month as 30 days
+        return timedelta(days=value * 30)
+    elif unit in ["y", "year", "years"]:  # Approximate 1 year as 365 days
+        return timedelta(days=value * 365)
+    else:
+        raise ValueError(f"Unsupported step unit: {unit}")
+
+step_timedelta = parse_step(step)
+dates = [(start_datetime + step_timedelta * i).strftime('%Y-%m-%d') for i in range(num_frames)] # ('%Y-%m-%d %H:%M') 
+
+
+fig = go.Figure()
+
+for name, x_data, y_data, z_data, color, size in bodies:
+    fig.add_trace(go.Scatter3d(x=[x_data[0]], y=[y_data[0]], z=[z_data[0]], mode='markers',marker=dict(size=size, color=color), name=name))
+    fig.add_trace(go.Scatter3d(x=[0], y=[0], z=[0], mode='lines',line=dict(color=color, width=0.15), name=f"{name} Orbit"))
+
+
+frames = []
+for k in range(1, num_frames):
+    frame_data = []
+    for name, x_data, y_data, z_data, color, size in bodies:
+        frame_data.append(go.Scatter3d(x=[x_data[k]], y=[y_data[k]], z=[z_data[k]], mode='markers',marker=dict(size=size, color=color), name=name))
+        frame_data.append(go.Scatter3d(x=x_data[:k+1], y=y_data[:k+1], z=z_data[:k+1], mode='lines',line=dict(color=color, width=2), name=f"{name} Orbit"))
+    frames.append(go.Frame(data=frame_data, name=f"frame{k}" )) # , layout=dict(scene=dict(camera=fixed_camera))))
+
+fig.frames = frames
+
+
+fig.update_layout(
+    autosize=True,  
+    width=None, height=None,  
+    margin=dict(l=0, r=0, t=0, b=0),  
+    title=dict(text="2024 YR4 & Earth Orbit",font=dict(size=24, color="white"),x=0.5, xanchor="center"),
+    scene=dict(
+        xaxis=dict(visible=False, showgrid=False, showbackground=False),
+        yaxis=dict(visible=False, showgrid=False, showbackground=False),
+        zaxis=dict(visible=False, showgrid=False, showbackground=False),
+        bgcolor="rgba(0,0,0,0)",  # Fully transparent background
+    ),
+    paper_bgcolor="black", 
+    images=[  
+        dict(
+            source="https://upload.wikimedia.org/wikipedia/commons/f/f1/Milky_Way_24mm.jpg",
+            xref="paper", yref="paper",
+            x=0, y=0,  # Position at bottom-left corner
+            sizex=1, sizey=1,  # Stretch fully across
+            xanchor="left", yanchor="bottom",
+            layer="below" 
+        )
+    ], legend=dict(itemsizing='constant',x=0.9, y=1.1,bgcolor="rgba(0,0,0,0)" )
+)
+
+
+
+fig.update_layout(
+    updatemenus=[
+        dict(
+            type="buttons",
+            showactive=False,
+            buttons=[
+                dict(label="Play", method="animate",
+                     args=[None, dict(frame=dict(duration=default_speed, redraw=True), fromcurrent=True)]),
+                dict(label="Pause", method="animate",
+                     args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),],
+            x=0, y=1.25,  # Increased spacing above the plot
+            direction="left"
+        )
+    ]
+)
+
+
+fig.update_layout(
+    sliders=[
+        dict(
+            currentvalue={"prefix": "Speed: ", "font": {"size": 16}},
+            pad={"b": 60, "t": 10},  # Increased separation
+            steps=[
+                dict(
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=speed, redraw=True), mode="immediate", fromcurrent=True)],
+                    label=str(speed) + "ms"
+                ) for speed in range(300, 10, -10)
+            ]
+        ),
+        dict(
+            pad={"b": 10, "t": 90},  
+            steps=[
+                dict(
+                    method="animate",
+                    args=[[f"frame{k}"], dict(mode="immediate", frame=dict(duration=0, redraw=True))],
+                    label=dates[k]
+                ) for k in range(num_frames)
+            ],
+            active=0,
+            transition=dict(duration=0)
+        )
+    ]
+)
+
+
+fig.update_layout(width=1200,  height=800)
+
+fig.update_layout(scene=dict(dragmode="orbit"))
+fig.show()
