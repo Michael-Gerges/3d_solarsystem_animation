@@ -198,3 +198,140 @@ fig.update_layout(width=1200,  height=800)
 
 fig.update_layout(scene=dict(dragmode="orbit"))
 fig.show()
+
+###########################################################################################################
+
+
+
+
+import warnings
+from astropy.utils.exceptions import AstropyDeprecationWarning
+warnings.simplefilter('ignore', category=AstropyDeprecationWarning)
+
+
+
+from astroquery.jplhorizons import Horizons
+import numpy as np
+from datetime import datetime, timedelta
+
+def get_trajectory(obj_id, start_date, end_date, step, id_type, location):
+    obj = Horizons(id=obj_id,id_type=id_type,location=location,epochs={'start': start_date, 'stop': end_date, 'step': step},  )
+    vectors = obj.vectors(refplane='frame') # ecliptic is Earth’s orbital plane, by using frame you dont need to call icrf_to_ecliptic
+    
+    jd = np.array(vectors['datetime_jd'], dtype=float)
+    x = np.array(vectors['x'], dtype=float)
+    y = np.array(vectors['y'], dtype=float)
+    z = np.array(vectors['z'], dtype=float)
+    return jd ,x,y,z
+
+
+# Constants
+AU_TO_KM = 149597870.7  # 1 AU in km
+EARTH_RADIUS_KM = 6371  # Earth radius in km
+
+# Function to calculate Euclidean distance
+def calculate_distance(x1, y1, z1, x2, y2, z2):
+    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+# Function to find closest approach time
+def find_closest_approach(jd, distances):
+    min_index = np.argmin(distances)
+    return jd[min_index], distances[min_index]
+
+# Convert JD to human-readable date
+def jd_to_datetime(jd):
+    return datetime(2000, 1, 1) + timedelta(days=jd - 2451545.0)
+
+# Define input parameters
+step = '20m'  # High resolution for better accuracy
+
+def analyze_approach(obj_id, date):
+    date_obj = datetime.strptime(date, "%Y-%m-%d")
+    start_date = (date_obj - timedelta(days=1)).strftime("%Y-%m-%d 00:00")
+    end_date = (date_obj + timedelta(days=1)).strftime("%Y-%m-%d 23:59")
+    
+    # Get trajectories
+    jd_ast, x_ast, y_ast, z_ast = get_trajectory(obj_id, start_date, end_date, step, id_type='smallbody', location='@sun')
+    jd_earth, x_earth, y_earth, z_earth = get_trajectory('399', start_date, end_date, step, id_type='majorbody', location='@sun')
+    
+    # Calculate distances in AU
+    distances_au = calculate_distance(x_ast, y_ast, z_ast, x_earth, y_earth, z_earth)
+    
+    # Convert distances to km and subtract Earth's radius
+    distances_km = distances_au * AU_TO_KM - EARTH_RADIUS_KM
+    
+    # Find closest approach
+    closest_jd, min_distance_km = find_closest_approach(jd_ast, distances_km)
+    closest_datetime = jd_to_datetime(closest_jd)
+    
+    return closest_datetime, min_distance_km
+
+# Analyze Apophis on 2029-04-22
+closest_datetime_apophis, min_distance_apophis = analyze_approach('99942', '2029-04-13')
+print(f"Apophis closest approach: {closest_datetime_apophis}, Distance from surface: {min_distance_apophis:.2f} km")
+
+closest_datetime_m, min_distance_m = analyze_approach('301', '2029-04-13')
+print(f"closest moon distance on this day: {closest_datetime_m}, Distance from surface: {min_distance_m:.2f} km")
+
+print("ratio = " ,min_distance_m/min_distance_apophis, ' the moon is that much further away from earth')
+# Analyze 2024 YR4 on 2032-12-22
+closest_datetime_yr4, min_distance_yr4 = analyze_approach('2024 YR4', '2032-12-22')
+print(f"2024 YR4 closest approach: {closest_datetime_yr4}, Distance from surface: {min_distance_yr4:.2f} km")
+
+closest_datetime_m, min_distance_m = analyze_approach('301', '2032-12-22')
+print(f"closest moon distance on this day: {closest_datetime_m}, Distance from surface: {min_distance_m:.2f} km")
+print("ratio = " ,min_distance_m/min_distance_yr4 ,' the moon is that much further away from earth')
+
+
+#Apophis closest approach: 2029-04-13 09:40:00.000018, Distance from surface: 31721.77 km
+#closest moon distance on this day: 2029-04-14 11:39:59.999991, Distance from surface: 489117153.76 km
+#ratio =  15418.972677505742  the moon is that much further away from earth
+#2024 YR4 closest approach: 2032-12-21 22:59:59.999973, Distance from surface: 151501.69 km
+#closest moon distance on this day: 2032-12-23 11:39:59.999991, Distance from surface: 523776750.64 km
+#ratio =  3457.2336040582204  the moon is that much further away from earth
+
+
+
+from astroquery.jplhorizons import Horizons
+import json
+
+# Define parameters
+obj_id = "2024 YR4"
+start_date = "2032-12-20 00:00"  # Start a couple of days before the closest approach
+end_date = "2032-12-24 00:00"    # Extend a couple of days after
+step = "10m"  # High-detail data points every hour
+
+# Query trajectory data
+obj = Horizons(id=obj_id, id_type='smallbody', location='500@10',  # Heliocentric (Sun-centered)
+               epochs={'start': start_date, 'stop': end_date, 'step': step})
+vectors = obj.vectors()
+
+# Convert data to JSON format
+trajectory_data = {
+    "object": obj_id,
+    "start_date": start_date,
+    "end_date": end_date,
+    "step": step,
+    "data": []
+}
+
+for row in vectors:
+    trajectory_data["data"].append({
+        "datetime": row["datetime_str"],
+        "jd": row["datetime_jd"],
+        "x": row["x"],
+        "y": row["y"],
+        "z": row["z"],
+        "vx": row["vx"],
+        "vy": row["vy"],
+        "vz": row["vz"]
+    })
+
+# Save to a JSON file
+json_filename = "2024_YR4_trajectory.json"
+with open(json_filename, "w") as json_file:
+    json.dump(trajectory_data, json_file, indent=4)
+
+print(f"Trajectory data saved to {json_filename}")
+
+
